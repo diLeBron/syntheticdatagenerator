@@ -1,0 +1,5 @@
+package generator
+
+trait GeneratorError {
+
+}
