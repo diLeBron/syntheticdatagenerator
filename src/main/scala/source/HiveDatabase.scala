@@ -2,12 +2,12 @@ package source
 
 import cats.effect.IO
 import config.SourceConfig
-import org.apache.spark.sql.{DataFrame, SaveMode}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import service.GeneratorError
 
 class HiveDatabase() extends Database {
-  override def load(sc: SourceConfig, query: String): IO[Either[GeneratorError, DataFrame]] = {
-    IO(Right(sc.spark.sql(query)))
+  override def load(spark: SparkSession, sc: SourceConfig, query: String): IO[Either[GeneratorError, DataFrame]] = {
+    IO(Right(spark.sql(query)))
   }
 
   override def save(df: DataFrame): IO[Either[GeneratorError, Unit]] = {

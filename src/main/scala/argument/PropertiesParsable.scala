@@ -1,13 +1,19 @@
 package argument
 
-import config.PropertiesConfig
+import config.{PropertiesConfig, PropsConfig}
 
 import java.io._
 import java.util._
 
 trait PropertiesParsable {
-  val props: Properties = {
-    val f = new File("application.properties")
+  def properties(fileName: String): Properties
+
+  def config(fileName: String): PropertiesConfig
+}
+
+class PropertiesParsableImpl extends PropertiesParsable {
+  def properties(fileName: String): Properties = {
+    val f = new File(fileName)
     val props = new Properties
     val fis = new InputStreamReader(new FileInputStream(f), "UTF-8")
     props.load(fis)
@@ -15,10 +21,8 @@ trait PropertiesParsable {
     props
   }
 
-  def config(): PropertiesConfig = {
-    new PropertiesConfig {
-      override val url: Option[String] = Some(props.getProperty("url"))
-      override val schema: Option[String] = Some(props.getProperty("schema"))
-    }
+  def config(fileName: String): PropertiesConfig = {
+    val props = properties(fileName)
+    PropsConfig(Some(props.getProperty("url")), Some(props.getProperty("schema")))
   }
 }
