@@ -1,19 +1,23 @@
 package data
-import config.SourceConfig
+import cats.effect.IO
+import config.{PostgresConfig, SourceConfig}
+import generator.GeneratorError
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import config.PostgresConfig
-import spark.SparkSessionCreatable
 
 import java.util.Properties
 
 class PostgresDatabase extends Database {
-  override def load(sc: SourceConfig) = ???
-  override def save() = ???
-
-  def readTable(tableName: String, config: PostgresConfig, spark: SparkSession): DataFrame = {
-    val getConfig = config.getConfig("host", 8443, "database")
-    val url = getConfig._1
-    val props = getConfig._2
-    spark.read.jdbc(url, tableName, props)
+  override def load(sc: SourceConfig, spark: SparkSession): IO[Either[GeneratorError, DataFrame]] = {
+    val conf = sc.getConfig()
+    val res = for {
+      url <- conf.url
+      props <- conf.props
+    } yield (url, props)
+    res match {
+      case Some((url, props)) =>
+        val df = spark.read.jdbc(url, "tableName", props)
+        IO(Right(df))
+    }
   }
+  override def save() = ???
 }

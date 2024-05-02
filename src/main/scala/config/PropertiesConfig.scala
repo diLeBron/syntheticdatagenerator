@@ -1,5 +1,5 @@
 package config
 
-trait PropertiesConfig  extends Config {
-
+trait PropertiesConfig extends Config {
+  def getConfig(): Postgres
 }
