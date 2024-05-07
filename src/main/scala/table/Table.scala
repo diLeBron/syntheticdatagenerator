@@ -1,5 +1,0 @@
-package table
-
-trait Table {
-
-}
