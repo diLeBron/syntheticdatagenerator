@@ -1,5 +1,3 @@
 package config
 
-trait HiveConfig extends PropertiesConfig {
-
-}
+trait HiveConfig extends PropertiesConfig

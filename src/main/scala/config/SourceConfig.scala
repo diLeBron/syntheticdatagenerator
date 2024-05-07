@@ -1,5 +1,3 @@
 package config
 
-trait SourceConfig extends PropertiesConfig {
-
-}
+trait SourceConfig extends HiveConfig with PostgresConfig
