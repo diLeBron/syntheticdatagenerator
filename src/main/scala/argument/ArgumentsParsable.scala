@@ -6,7 +6,6 @@ import utils.{DataTypes, GenerationTypes}
 
 trait ArgumentsParsable {
   def config(args: Array[String]): Option[ArgumentsConfig]
-  def configTest(args: Array[String]): Option[ArgumentsConfig]
 }
 
 case class ApplicationParamsConfig(
@@ -56,27 +55,9 @@ class ArgumentsParsableImpl extends ArgumentsParsable {
           .validate(x =>
             if (List("synthetic", "semi-synthetic").contains(x.name.toLowerCase())) success
             else failure("Supported generation data types: [synthetic, semi-synthetic]"))
-          .text("genType is GenerationTypes property"),
+          .text("genType is GenerationTypes property")
       )
     }
     OParser.parse(parser, args, AppParamsConfig())
-  }
-
-  override def configTest(args: Array[String]): Option[ArgumentsConfig] = {
-    val builder = OParser.builder[ApplicationParamsConfig]
-    val parser = {
-      import builder._
-      OParser.sequence(
-        programName("scopt"),
-        head("scopt", "4.x"),
-        opt[CredsConfig]('a', "authorName")
-          .action((x, c) => c.copy(credsConfig = x))
-          .text("authorName is an CredsConfig property"),
-        opt[DataConfig]('d', "data")
-          .action((x, c) => c.copy(dataConfig = x))
-          .text("data is DataConfig property")
-      )
-    }
-    OParser.parse(parser, args, ApplicationParamsConfig())
   }
 }
