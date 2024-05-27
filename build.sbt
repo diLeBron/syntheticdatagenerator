@@ -16,7 +16,8 @@ libraryDependencies ++= Seq(
   "org.apache.flink" %% "flink-scala" % "1.14.4",
   "org.apache.flink" %% "flink-streaming-scala" % "1.14.4",
   "org.apache.flink" %% "flink-connector-kafka" % "1.14.4",
-  "org.apache.flink" % "flink-connector-base" % "1.14.4"
+  "org.apache.flink" % "flink-connector-base" % "1.14.4",
+  "org.apache.flink" %% "flink-clients" % "1.14.4"
 )
 
 dependencyOverrides += "org.scala-lang.modules" %% "scala-xml" % "2.1.0"
