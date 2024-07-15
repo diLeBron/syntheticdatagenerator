@@ -5,7 +5,7 @@ import config.ArgumentsConfig
 import utils.{DataTypes, GenerationTypes}
 
 trait ArgumentsParsable {
-  def config(args: Array[String]): Option[ArgumentsConfig]
+  def config(args: Array[String]): Option[AppParamsConfig]
 }
 
 case class ApplicationParamsConfig(
@@ -34,7 +34,7 @@ class ArgumentsParsableImpl extends ArgumentsParsable {
     )
   )
 
-  def config(args: Array[String]): Option[ArgumentsConfig] = {
+  def config(args: Array[String]): Option[AppParamsConfig] = {
     val builder = OParser.builder[AppParamsConfig]
     val parser = {
       import builder._

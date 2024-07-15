@@ -1,14 +1,19 @@
 package argument
 
-import config.{PropertiesConfig, PropsConfig}
+import config.{PropertiesConfig, PropsConfig, SyntheticRules, DatabaseConfig}
+import source.TableFields
+import ujson.Value
 
 import java.io._
 import java.util._
+import scala.collection.immutable.{List, Map}
 
 trait PropertiesParsable {
   def properties(fileName: String): Properties
 
   def config(fileName: String): PropertiesConfig
+
+  def rules(pathToFile: String): List[Value]
 }
 
 class PropertiesParsableImpl extends PropertiesParsable {
@@ -21,8 +26,25 @@ class PropertiesParsableImpl extends PropertiesParsable {
     props
   }
 
-  def config(fileName: String): PropertiesConfig = {
+  def config(fileName: String): PropsConfig = {
     val props = properties(fileName)
-    PropsConfig(Some(props.getProperty("url")), Some(props.getProperty("schema")))
+    PropsConfig(
+      DatabaseConfig(
+        props.getProperty("connection.url"),
+        props.getProperty("driver.class.name"),
+        props.getProperty("user"),
+        props.getProperty("password"),
+      ),
+      props.getProperty("synthetic.rules.path")
+    )
+  }
+
+  override def rules(pathToFile: String): List[Value] = {
+    val source = scala.io.Source.fromFile(pathToFile)
+    val lines =
+      try source.mkString
+      finally source.close()
+
+    ujson.read(lines).arr.toList
   }
 }
