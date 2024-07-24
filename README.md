@@ -24,6 +24,15 @@
 
 Для парсинга входных параметров консольного приложения использовать библиотеки scopt, monocle
 
+## Инструкция по тестированию приложения генерации синтетических данных
+
+1. Поднятие докер образа с Hive (например, https://github.com/big-data-europe/docker-hive/tree/master)
+2. Поднятие докер образа с Postgres (например, https://github.com/khezen/compose-postgres/tree/master)
+3. Настройка параметров генерации схем и таблиц (пример, в корневой директории rulesMinHiveTest.json и rulesMinPostgresTest.json)
+4. Настройка параметров в application.properties
+5. Запуск Main.scala с аргументом -s (или --srcDataType) Hive (или Postgres)
+6. При успешной работе должны создаться схемы и таблицы в БД, указанном в application.properties
+   Если таблицы существуют перед запуском, то они удаляются и пересоздаются со структурой, которая указано в файле из п.3
 
 ## Getting started
 

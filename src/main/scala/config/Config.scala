@@ -6,4 +6,14 @@ trait ArgumentsConfig extends Config
 
 trait PropertiesConfig extends Config
 
-case class PropsConfig(url: Option[String], schema: Option[String]) extends PropertiesConfig
+trait Rules extends Config
+
+case class DatabaseConfig(connectionUrl: String, driver: String, user: String, password: String) extends PropertiesConfig
+
+case class PropsConfig(dbConfig: DatabaseConfig, rulesPath: String) extends PropertiesConfig
+
+case class SyntheticRules(
+    mapRowCount: Map[String, Int],
+    fieldRules: Map[String, Map[String, String]],
+    tableSettingsMap: Map[String, List[Map[String, String]]]
+)
