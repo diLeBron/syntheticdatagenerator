@@ -9,7 +9,14 @@ class PostgresTemplateImpl extends Template {
     s"DROP TABLE IF EXISTS $schema.$table CASCADE"
 
   override def makeFields(fields: TableFields): String = {
-    s"${fields.name} ${fields.dataType}"
+    if (fields.isPrimaryKey) s"${fields.name} ${fields.dataType} PRIMARY KEY"
+    else {
+      val madeFields = s"${fields.name} ${fields.dataType}"
+      if (fields.unique) madeFields + " UNIQUE"
+      else if (fields.unique & !fields.nullable) madeFields + " UNIQUE" + " NOT NULL"
+      else if (!fields.nullable) madeFields + " NOT NULL"
+      else madeFields
+    }
   }
 
   override def createTable(

@@ -6,6 +6,8 @@ import java.time.{LocalDate, LocalDateTime, ZoneOffset}
 import scala.util.Random
 import ujson.Value
 
+import utils.Logger
+
 object SampleGenerator {
   private val random = new Random(System.nanoTime)
   private val timestampFmt = "yyyy-MM-dd HH:mm:ss"
@@ -84,7 +86,8 @@ object SampleGenerator {
       dataType: String,
       action: String,
       rule: Map[String, Value],
-      count: Int
+      count: Int,
+      logger: Logger
   ): List[Any] = {
     val dtype = dataType.split('(').head
     if (action.toLowerCase == "insert") {
@@ -93,7 +96,8 @@ object SampleGenerator {
         val a = data.map(x => x.toString().replace("\"", "'"))
         a
       } else data
-    } else {
+    }
+    else if (action.toLowerCase == "generation") {
       (dtype, rule) match {
         case ("int", r) if r.isEmpty => List.fill(count)(between(0, 2147483646))
         case ("int", r) if r.contains("acceptable_values") =>
@@ -167,17 +171,23 @@ object SampleGenerator {
             count
           ).map(x => s"'${x}'")
         case (_, _) =>
-          println(s"Unsupported data type = `${dataType}` and rule = `${rule}`")
+          logger.warning(s"Unsupported data type = `${dataType}` and rule = `${rule}`. " +
+            s"Supported: [int, string, varchar, boolean, timestamp]")
           List.empty
       }
+    }
+    else {
+      logger.warning(s"Unsupported data action = ${action}. Supported: [generation, insert]")
+      List.empty
     }
   }
 
   def generator(
       rules: List[(String, String, Map[String, Value])],
-      count: Int
+      count: Int,
+      logger: Logger
   ): List[List[Any]] = {
-    val a = rules.map(x => generate(x._1, x._2, x._3, count))
+    val a = rules.map(x => generate(x._1, x._2, x._3, count, logger))
     a
   }
 

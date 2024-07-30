@@ -1,18 +1,36 @@
-import argument.{ArgumentsParsableImpl, PropertiesParsableImpl}
+import argument.{AppParamsConfig, ArgumentsParsableImpl, PropertiesParsableImpl}
+import config.{DatabaseConfig, PropsConfig}
+import utils.Logger
 import source.synthetic.SyntheticGeneratorImpl
+
+import scala.util.{Failure, Success, Try}
 
 
 object Main {
   def main(args: Array[String]): Unit = {
+    val logger = new Logger()
+
     val argsPars = new ArgumentsParsableImpl()
-    val cfg = argsPars.config(args)
+    val cfg = Try(argsPars.config(args)) match {
+      case Success(v) => v
+      case Failure(e) => {
+        logger.error("Failed in parsing arguments", e)
+        Some(AppParamsConfig())
+      }
+    }
 
     val propPars = new PropertiesParsableImpl()
 
-    val props = propPars.config("application.properties")
+    val props = Try(propPars.config("application.properties")) match {
+      case Success(v) => v
+      case Failure(e) => {
+        logger.error("Failed in parsing config file application.properties", e)
+        PropsConfig(DatabaseConfig("", "", "", ""), "")
+      }
+    }
 
     val syntheticGenerator = new SyntheticGeneratorImpl()
 
-    syntheticGenerator.generate(props, cfg.get.srcDataType.name)
+    syntheticGenerator.generate(props, cfg.get.srcDataType.name, logger)
   }
 }
