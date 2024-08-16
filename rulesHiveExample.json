@@ -1,0 +1,256 @@
+[
+  {
+    "schema": "schema_1",
+    "tables": [
+      {
+        "name": "table_1A",
+        "kafka_topic": "schema_1.table_1A",
+        "row_count": 3,
+        "recreate": true,
+        "columns": [
+          {
+            "name": "field_int0",
+            "type": "int",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {}
+            }
+          },
+          {
+            "name": "field_int1",
+            "type": "int",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "lower_threshold": 1,
+                "upper_threshold": 100
+              }
+            }
+          },
+          {
+            "name": "field_int2",
+            "type": "int",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "initial_value": 10,
+                "repeat_number": 2,
+                "step": 5
+              }
+            }
+          },
+          {
+            "name": "field_int3",
+            "type": "int",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "acceptable_values": [100, 200, 400]
+              }
+            }
+          },
+          {
+            "name": "field_int4",
+            "type": "int",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "insert",
+              "rules": {
+                "values": [1, 2, 3]
+              }
+            }
+          },
+          {
+            "name": "field_bool",
+            "type": "boolean",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {}
+            }
+          },
+          {
+            "name": "field_bool_2",
+            "type": "boolean",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "acceptable_values": [true]
+              }
+            }
+          },
+          {
+            "name": "field_bool_3",
+            "type": "boolean",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "insert",
+              "rules": {
+                "values": [true, false, true]
+              }
+            }
+          },
+          {
+            "name": "field_ts_1",
+            "type": "timestamp",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "start": "2023-08-08T12:15:30",
+                "step_by_minutes": 30
+              }
+            }
+          },
+          {
+            "name": "field_ts_11",
+            "type": "timestamp",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "lower_threshold": "2023-08-08T12:15:30",
+                "upper_threshold": "2024-08-08T12:15:30"
+              }
+            }
+          },
+          {
+            "name": "field_ts_111",
+            "type": "timestamp",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {}
+            }
+          },
+          {
+            "name": "field_ts_2",
+            "type": "timestamp",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "acceptable_values": ["2024-07-07 10:15:30", "2024-07-08 10:15:30"]
+              }
+            }
+          },
+          {
+            "name": "field_ts_33",
+            "type": "timestamp",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "insert",
+              "rules": {
+                "values": ["2024-07-08 10:15:30", "2024-07-08 11:15:30", "2024-07-08 12:15:30"]
+              }
+            }
+          },
+          {
+            "name": "field_varchar",
+            "type": "varchar(3)",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "acceptable_values": [
+                  "dev",
+                  "ift",
+                  "psi",
+                  "prd"
+                ]
+              }
+            }
+          },
+          {
+            "name": "field_varchar_2",
+            "type": "varchar(10)",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "insert",
+              "rules": {
+                "values": [
+                  "develop",
+                  "ift",
+                  "production"
+                ]
+              }
+            }
+          },
+          {
+            "name": "field_varchar_3",
+            "type": "varchar(5)",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {}
+            }
+          },
+          {
+            "name": "field_str",
+            "type": "string",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "acceptable_values": [
+                  "dev",
+                  "ift",
+                  "psi",
+                  "prd"
+                ]
+              }
+            }
+          },
+          {
+            "name": "field_str_2",
+            "type": "string",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "insert",
+              "rules": {
+                "values": [
+                  "develop",
+                  "ift",
+                  "production"
+                ]
+              }
+            }
+          },
+          {
+            "name": "field_str_3",
+            "type": "string",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {}
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

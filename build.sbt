@@ -1,8 +1,11 @@
 ThisBuild / version := "0.1.0-Synthetic"
 ThisBuild / scalaVersion := "2.12.15"
 
+val main_class: String = "ru.digitalleague.syntheticdatagenerator.Main"
+
 lazy val root = (project in file("."))
   .settings(
+    assembly / mainClass := Some(main_class),
     name := "syntheticdatagenerator"
   )
 
@@ -46,3 +49,11 @@ libraryDependencies ++= Seq(
 )
 
 dependencyOverrides += "org.scala-lang.modules" %% "scala-xml" % "2.1.0"
+
+assemblyMergeStrategy in assembly := {
+  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case _ => MergeStrategy.first
+}
+
+mainClass in assembly := Some(main_class)
+mainClass in Compile := Some(main_class)
