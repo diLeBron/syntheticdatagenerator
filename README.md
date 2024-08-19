@@ -58,9 +58,22 @@
             2.5.6.2.8. start - начало времени (поддерживается для типа данных timestamp)
             2.5.6.2.9. step_by_minutes - шаг генерации даты, в минутах
 
+## Сборка приложения FAT JAR
+sbt assembly
 
+## Запуск приложения FAT JAR
+java -jar file_app_name.jar app_args
+
+где file_app_name - название файла с расширением jar
+app_args - аргументы приложения
+
+Примеры:
+java -jar .\syntheticdatagenerator-assembly-0.1.0-Synthetic.jar -m batch -t postgres
+java -jar .\syntheticdatagenerator-assembly-0.1.0-Synthetic.jar -m stream
+
+
+------------------------------------- DRAFT ----------------------------------------------------------------------------
 ## Инструкция по запуску приложения генерации синтетических данных
-
 1. Настройка 
 2. Поднятие докер образа с Hive (например, https://github.com/big-data-europe/docker-hive/tree/master)
 2. Поднятие докер образа с Postgres (например, https://github.com/khezen/compose-postgres/tree/master)

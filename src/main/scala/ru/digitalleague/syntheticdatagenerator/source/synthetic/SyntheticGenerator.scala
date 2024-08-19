@@ -16,7 +16,7 @@ import scala.sys.exit
 import scala.util.{Failure, Success, Try}
 
 trait SyntheticGenerator {
-  def generate(tmp: Template): SyntheticData
+//  def generate(tmp: Template): SyntheticData
 
   def generate(props: PropsConfig, config: Option[AppParamsConfig], logger: SimpleLogger): Unit
 
@@ -32,7 +32,7 @@ trait SyntheticGenerator {
 }
 
 class SyntheticGeneratorImpl extends SyntheticGenerator {
-  override def generate(tmp: Template): SyntheticData = ???
+//  override def generate(tmp: Template): SyntheticData = ???
 
   override def generateTable(
                               stmt: Statement,
