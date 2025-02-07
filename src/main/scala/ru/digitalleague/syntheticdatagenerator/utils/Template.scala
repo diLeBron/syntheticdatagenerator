@@ -3,6 +3,8 @@ package ru.digitalleague.syntheticdatagenerator.utils
 import ru.digitalleague.syntheticdatagenerator.source.TableFields
 
 trait Template {
+  def dropSchema(schema: String): String
+
   def createSchema(schema: String): String
 
   def dropTable(schema: String, table: String): String

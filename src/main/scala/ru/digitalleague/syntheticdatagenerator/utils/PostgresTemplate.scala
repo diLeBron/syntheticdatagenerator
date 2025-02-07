@@ -3,6 +3,8 @@ package ru.digitalleague.syntheticdatagenerator.utils
 import ru.digitalleague.syntheticdatagenerator.source.TableFields
 
 class PostgresTemplateImpl extends Template {
+  override def dropSchema(schema: String): String = s"DROP SCHEMA IF EXISTS $schema"
+
   override def createSchema(schema: String): String = s"CREATE SCHEMA IF NOT EXISTS $schema"
 
   override def dropTable(schema: String, table: String): String =

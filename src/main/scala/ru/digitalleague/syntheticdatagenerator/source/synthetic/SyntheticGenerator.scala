@@ -9,7 +9,7 @@ import ru.digitalleague.syntheticdatagenerator.streams.flink.FlinkSinkToKafkaApp
 import ru.digitalleague.syntheticdatagenerator.streams.kafka.Client.createTopic
 import ujson.Value
 import ru.digitalleague.syntheticdatagenerator.utils.Json.convertToJson
-import ru.digitalleague.syntheticdatagenerator.utils.{HiveTemplateImpl, PostgresTemplateImpl, SimpleLogger, Template}
+import ru.digitalleague.syntheticdatagenerator.utils.{HiveTemplateImpl, PostgresOlder10vTemplateImpl, PostgresTemplateImpl, SimpleLogger, Template}
 
 import java.sql.{Connection, DriverManager, Statement}
 import scala.sys.exit
@@ -21,13 +21,13 @@ trait SyntheticGenerator {
   def generate(props: PropsConfig, config: Option[AppParamsConfig], logger: SimpleLogger): Unit
 
   def generateTable(
-                     stmt: Statement,
-                     schema: String,
-                     table: String,
-                     tableSettings: Value,
-                     dbTemplate: Template,
-                     logger: SimpleLogger,
-                     mode: String
+      stmt: Statement,
+      schema: String,
+      table: String,
+      tableSettings: Value,
+      dbTemplate: Template,
+      logger: SimpleLogger,
+      mode: String
   ): GeneratedData
 }
 
@@ -35,13 +35,13 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
 //  override def generate(tmp: Template): SyntheticData = ???
 
   override def generateTable(
-                              stmt: Statement,
-                              schema: String,
-                              table: String,
-                              tableSettings: Value,
-                              dbTemplate: Template,
-                              logger: SimpleLogger,
-                              mode: String
+      stmt: Statement,
+      schema: String,
+      table: String,
+      tableSettings: Value,
+      dbTemplate: Template,
+      logger: SimpleLogger,
+      mode: String
   ): GeneratedData = {
     val rowCount = Try(tableSettings("row_count").num.toInt) match {
       case Success(v) => v
@@ -55,7 +55,8 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         val dropQuery = dbTemplate.dropTable(schema, table)
         Try(stmt.execute(dropQuery)) match {
           case Success(_) => logger.info(s"Successfully drop table if exists = ${schema}.${table}")
-          case Failure(e) => logger.error(s"Failed in drop table = ${schema}.${table}. Query: `${dropQuery}``", e)
+          case Failure(e) =>
+            logger.error(s"Failed in drop table = ${schema}.${table}. Query: `${dropQuery}``", e)
         }
       }
 
@@ -142,21 +143,28 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
     } else GeneratedData(List.empty, List.empty)
   }
 
-  override def generate(props: PropsConfig, config: Option[AppParamsConfig], logger: SimpleLogger): Unit = {
+  override def generate(
+      props: PropsConfig,
+      config: Option[AppParamsConfig],
+      logger: SimpleLogger
+  ): Unit = {
 //    System.setProperty("hadoop.home.dir", "C:\\hadoop")
 
     val mode = Try(config.get.mode) match {
-      case Success(v) => v match {
-        case "NoDef" => {
-          logger.warning("Set default app mode = batch because not specified in arguments. " +
-            "For another mode pLease specify throw args -m or --mode. Supported: [batch, stream]")
-          "batch"
+      case Success(v) =>
+        v match {
+          case "NoDef" => {
+            logger.warning(
+              "Set default app mode = batch because not specified in arguments. " +
+                "For another mode pLease specify throw args -m or --mode. Supported: [batch, stream]"
+            )
+            "batch"
+          }
+          case _ => {
+            logger.info(s"App mode = ${v.toLowerCase} was specified")
+            v.toLowerCase
+          }
         }
-        case _ => {
-          logger.info(s"App mode = ${v.toLowerCase} was specified")
-          v.toLowerCase
-        }
-      }
       case Failure(e) => {
         logger.error("Failed in parsing app mode", e)
         ""
@@ -206,14 +214,24 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         )
         null
       }
-    } else null
+    }
+    else null
 
-    val dbTemplate = config.get.targetDatabaseType.name.toLowerCase match {
+    val dbName = config.get.targetDatabaseType.name.toLowerCase
+    val dbVersion = props.dbConfig.dbVersion
+    val dbTemplate = dbName match {
       case "hive" => new HiveTemplateImpl()
-      case "postgres" => new PostgresTemplateImpl()
+      case "postgres" =>
+        if (dbVersion != 0 & dbVersion < 10) new PostgresOlder10vTemplateImpl()
+        else new PostgresTemplateImpl()
+      case "greenplum" =>
+        if (dbVersion != 0 & dbVersion < 10) new PostgresOlder10vTemplateImpl()
+        else new PostgresTemplateImpl()
       case dbType => {
         if (mode == "batch") {
-          logger.warning(s"Unsupported target database type specified: `${dbType}`. Supported: [hive, postgres]")
+          logger.warning(
+            s"Unsupported target database type specified: `${dbType}`. Supported: [hive, postgres]"
+          )
           exit(1)
         } else new PostgresTemplateImpl()
       }
@@ -230,91 +248,106 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
 
       if (mode == "batch") {
         if (schema.isEmpty) logger.warning(s"Incorrect specified database schema name in rules")
+        else if (List("postgres", "greenplum").contains(dbName) & dbVersion != 0 & dbVersion < 10) {
+          stmt.execute(dbTemplate.dropSchema(schema))
+          stmt.execute(dbTemplate.createSchema(schema))
+        }
         else stmt.execute(dbTemplate.createSchema(schema))
       }
 
-        val tables = Try(schemaSettings("tables").arr.toList) match {
+      val tables = Try(schemaSettings("tables").arr.toList) match {
+        case Success(v) => v
+        case Failure(e) => {
+          logger.error("Failed in parsing tables", e)
+          List.empty
+        }
+      }
+
+      for (tableSettings <- tables) {
+        val table = Try(tableSettings("name").toString().replaceAll("\"", "")) match {
           case Success(v) => v
           case Failure(e) => {
-            logger.error("Failed in parsing tables", e)
-            List.empty
+            logger.error(s"Failed in parsing table name for schema = ${schema}", e)
+            ""
           }
         }
 
-        for (tableSettings <- tables) {
-          val table = Try(tableSettings("name").toString().replaceAll("\"", "")) match {
-            case Success(v) => v
-            case Failure(e) => {
-              logger.error(s"Failed in parsing table name for schema = ${schema}", e)
-              ""
-            }
-          }
-
-          if (table.nonEmpty) {
-            if (mode == "batch") {
-              val generatedData = Try(generateTable(stmt, schema, table, tableSettings, dbTemplate, logger, mode)) match {
-                case Success(v) => v
-                case Failure(e) => {
-                  logger.error(
-                    s"Failed in generation data for table = ${schema}.${table}",
-                    e
-                  )
-                  GeneratedData(List.empty, List.empty)
-                }
-              }
-
-              val insertQueries = Try(generatedData.data.map(x => dbTemplate.insertIntoTable(schema, table, x))) match {
-                case Success(v) => v
-                case Failure(e) => {
-                  logger.error(
-                    s"Failed in generation insert queries for table = ${schema}.${table}",
-                    e
-                  )
-                  List.empty
-                }
-              }
-
-              if (insertQueries.nonEmpty) {
-                insertQueries.map(stmt.execute)
-                logger.info(
-                  s"${insertQueries.length} row(s) inserted into table = ${schema}.${table}"
+        if (table.nonEmpty) {
+          if (mode == "batch") {
+            val generatedData = Try(
+              generateTable(stmt, schema, table, tableSettings, dbTemplate, logger, mode)
+            ) match {
+              case Success(v) => v
+              case Failure(e) => {
+                logger.error(
+                  s"Failed in generation data for table = ${schema}.${table}",
+                  e
                 )
+                GeneratedData(List.empty, List.empty)
               }
             }
 
-            if (mode == "stream") {
-              val topicName = Try(tableSettings("kafka_topic").toString().replaceAll("\"", "")) match {
-                case Success(v) => v
-                case Failure(e) => {
-                  logger.error(s"Failed in parsing kafka topic for table = ${schema}.${table}. " +
-                    s"Set kafka topic = ${schema}.${table}", e)
-                  s"${schema}.${table}"
-                }
+            val insertQueries = Try(
+              generatedData.data.map(x => dbTemplate.insertIntoTable(schema, table, x))
+            ) match {
+              case Success(v) => v
+              case Failure(e) => {
+                logger.error(
+                  s"Failed in generation insert queries for table = ${schema}.${table}",
+                  e
+                )
+                List.empty
               }
-
-              Try(createTopic(props.kafkaConfig.brokers, topicName)) match {
-                case Success(_) => logger.info(s"Successfully created kafka topic = ${topicName}")
-                case Failure(e) => logger.error(s"Failed in creating kafka topic = ${topicName}", e)
-              }
-
-              val data = (Try(generateTable(stmt, schema, table, tableSettings, dbTemplate, logger, mode)) match {
-                case Success(v) => v
-                case Failure(e) => {
-                  logger.error(
-                    s"Failed in generation data for table = ${schema}.${table}",
-                    e
-                  )
-                  GeneratedData(List.empty, List.empty)
-                }
-              }).json.map(convertToJson)
-
-              logger.info(s"Start stream with sink to kafka for topic = ${topicName}")
-              FlinkSinkToKafkaAppRun(props.kafkaConfig.brokers, data, topicName)
-              logger.info(s"${data.length} message(s) write to kafka topic = ${topicName}" )
-              logger.info(s"Terminated stream with sink to kafka for topic = ${topicName}")
             }
-          } else logger.warning(s"Incorrect specified table name in rules for schema = ${schema}")
-        }
+
+            if (insertQueries.nonEmpty) {
+              insertQueries.map(stmt.execute)
+              logger.info(
+                s"${insertQueries.length} row(s) inserted into table = ${schema}.${table}"
+              )
+            }
+          }
+
+          if (mode == "stream") {
+            val topicName = Try(
+              tableSettings("kafka_topic").toString().replaceAll("\"", "")
+            ) match {
+              case Success(v) => v
+              case Failure(e) => {
+                logger.error(
+                  s"Failed in parsing kafka topic for table = ${schema}.${table}. " +
+                    s"Set kafka topic = ${schema}.${table}",
+                  e
+                )
+                s"${schema}.${table}"
+              }
+            }
+
+            Try(createTopic(props.kafkaConfig.brokers, topicName)) match {
+              case Success(_) => logger.info(s"Successfully created kafka topic = ${topicName}")
+              case Failure(e) => logger.error(s"Failed in creating kafka topic = ${topicName}", e)
+            }
+
+            val data = (Try(
+              generateTable(stmt, schema, table, tableSettings, dbTemplate, logger, mode)
+            ) match {
+              case Success(v) => v
+              case Failure(e) => {
+                logger.error(
+                  s"Failed in generation data for table = ${schema}.${table}",
+                  e
+                )
+                GeneratedData(List.empty, List.empty)
+              }
+            }).json.map(convertToJson)
+
+            logger.info(s"Start stream with sink to kafka for topic = ${topicName}")
+            FlinkSinkToKafkaAppRun(props.kafkaConfig.brokers, data, topicName)
+            logger.info(s"${data.length} message(s) write to kafka topic = ${topicName}")
+            logger.info(s"Terminated stream with sink to kafka for topic = ${topicName}")
+          }
+        } else logger.warning(s"Incorrect specified table name in rules for schema = ${schema}")
+      }
     }
 
     if (mode == "batch") {
@@ -324,7 +357,10 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
             s"Successfully connection closed for database = ${props.dbConfig.connectionUrl}"
           )
         case Failure(e) =>
-          logger.error(s"Failed closing connection for database = ${props.dbConfig.connectionUrl}", e)
+          logger.error(
+            s"Failed closing connection for database = ${props.dbConfig.connectionUrl}",
+            e
+          )
       }
     }
   }

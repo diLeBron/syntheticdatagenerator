@@ -48,8 +48,8 @@ class ArgumentsParsableImpl extends ArgumentsParsable {
         opt[DatabaseType]('t', "targetDBType")
           .action((x, c) => c.copy(targetDatabaseType = x))
           .validate(x =>
-            if (List("hive", "postgres").contains(x.name.toLowerCase())) success
-            else failure("Supported target database types: [Hive, Postgres]"))
+            if (List("hive", "postgres", "greenplum").contains(x.name.toLowerCase())) success
+            else failure("Supported target database types: [Hive, Postgres, Greenplum]"))
           .text("srcDataType is DataTypes property"),
         opt[GenerationTypes]('g', "genType")
           .action((x, c) => c.copy(genType = x))

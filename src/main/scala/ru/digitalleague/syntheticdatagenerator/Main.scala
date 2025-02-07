@@ -35,7 +35,7 @@ object Main {
       case Success(v) => v
       case Failure(e) => {
         logger.error("Failed in parsing config file application.properties", e)
-        PropsConfig(DatabaseConfig("", "", "", ""), "", KafkaConfig(""))
+        PropsConfig(DatabaseConfig("", "", "", "", 0), "", KafkaConfig(""))
       }
     }
 

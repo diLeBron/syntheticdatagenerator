@@ -34,6 +34,7 @@ class PropertiesParsableImpl extends PropertiesParsable {
         props.getProperty("driver.class.name"),
         props.getProperty("user"),
         props.getProperty("password"),
+        props.getProperty("database.version", "0").toInt
       ),
       props.getProperty("synthetic.rules.path"),
       KafkaConfig(props.getProperty("kafka.brokers"))

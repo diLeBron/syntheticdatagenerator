@@ -11,6 +11,8 @@ trait HiveTemplate extends Template {
 }
 
 class HiveTemplateImpl extends HiveTemplate {
+  override def dropSchema(schema: String): String = s"DROP DATABASE IF EXISTS $schema"
+
   override def createSchema(schema: String): String = s"CREATE DATABASE IF NOT EXISTS $schema"
 
   override def dropTable(schema: String, table: String): String =
