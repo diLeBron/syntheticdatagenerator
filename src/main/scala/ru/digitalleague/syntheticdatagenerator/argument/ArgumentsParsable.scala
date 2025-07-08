@@ -13,8 +13,9 @@ case class ApplicationParamsConfig(
     dataConfig: DataConfig = DataConfig()
 ) extends ArgumentsConfig
 case class AppParamsConfig(
-                            credsConfig: CredsConfig = CredsConfig("NoName"),
-                            targetDatabaseType: DatabaseType = DatabaseType("NoDef"),
+                            credentials: CredsConfig = CredsConfig("NoName"),
+                            source: DatabaseType = DatabaseType("NoDef"),
+                            target: DatabaseType = DatabaseType("NoDef"),
                             genType: GenerationTypes = GenerationTypes("NoDef"),
                             mode: String = "NoDef"
 ) extends ArgumentsConfig
@@ -43,16 +44,16 @@ class ArgumentsParsableImpl extends ArgumentsParsable {
         programName("SyntheticDataGenerator"),
         head("SyntheticDataGenerator", "0.1.0"),
         opt[CredsConfig]('a', "authorName")
-          .action((x, c) => c.copy(credsConfig = x))
+          .action((x, c) => c.copy(credentials = x))
           .text("authorName is CredsConfig property"),
         opt[DatabaseType]('s', "srcDataType")
-          .action((x, c) => c.copy(targetDatabaseType = x))
+          .action((x, c) => c.copy(source = x))
           .validate(x =>
             if (List("hive", "postgres", "greenplum", "kafka").contains(x.name.toLowerCase())) success
             else failure("Supported sources: [Hive, Postgres, Greenplum, Kafka]"))
           .text("srcDataType is DataTypes property"),
         opt[DatabaseType]('t', "targetDataType")
-          .action((x, c) => c.copy(targetDatabaseType = x))
+          .action((x, c) => c.copy(target = x))
           .validate(x =>
             if (List("hive", "postgres", "greenplum", "kafka").contains(x.name.toLowerCase())) success
             else failure("Supported targets: [Hive, Postgres, Greenplum, Kafka]"))

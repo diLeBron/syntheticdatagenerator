@@ -2,14 +2,25 @@ package ru.digitalleague.syntheticdatagenerator.source.synthetic
 
 import ru.digitalleague.syntheticdatagenerator.argument.{AppParamsConfig, PropertiesParsableImpl}
 import ru.digitalleague.syntheticdatagenerator.config.PropsConfig
-import ru.digitalleague.syntheticdatagenerator.service.GeneratedData
+import ru.digitalleague.syntheticdatagenerator.service.{
+  DatabaseConfigMap,
+  DatabaseConnectionPoolImpl,
+  GeneratedData
+}
 import ru.digitalleague.syntheticdatagenerator.source.TableFields
 import ru.digitalleague.syntheticdatagenerator.source.synthetic.SampleGenerator.generator
 import ru.digitalleague.syntheticdatagenerator.streams.flink.FlinkSinkToKafkaAppRun
 import ru.digitalleague.syntheticdatagenerator.streams.kafka.Client.createTopic
 import ujson.Value
 import ru.digitalleague.syntheticdatagenerator.utils.Json.convertToJson
-import ru.digitalleague.syntheticdatagenerator.utils.{GenerationType, HiveTemplateImpl, PostgresOlder10vTemplateImpl, PostgresTemplateImpl, SimpleLogger, Template}
+import ru.digitalleague.syntheticdatagenerator.utils.{
+  GenerationType,
+  HiveTemplateImpl,
+  PostgresOlder10vTemplateImpl,
+  PostgresTemplateImpl,
+  SimpleLogger,
+  Template
+}
 
 import java.sql.{Connection, DriverManager, ResultSet, Statement}
 import scala.sys.exit
@@ -21,7 +32,8 @@ trait SyntheticGenerator {
   def generate(props: PropsConfig, config: Option[AppParamsConfig], logger: SimpleLogger): Unit
 
   def generateTable(
-      stmt: Statement,
+      stmtSrc: Statement,
+      stmtTarget: Statement,
       schema: String,
       table: String,
       tableSettings: Value,
@@ -36,7 +48,8 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
 //  override def generate(tmp: Template): SyntheticData = ???
 
   override def generateTable(
-      stmt: Statement,
+      stmtSrc: Statement,
+      stmtTarget: Statement,
       schema: String,
       table: String,
       tableSettings: Value,
@@ -55,7 +68,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
     if (rowCount > 0) {
       if (mode == "batch" & tableSettings("recreate").bool) {
         val dropQuery = dbTemplate.dropTable(schema, table)
-        Try(stmt.execute(dropQuery)) match {
+        Try(stmtTarget.execute(dropQuery)) match {
           case Success(_) => logger.info(s"Successfully drop table if exists = ${schema}.${table}")
           case Failure(e) =>
             logger.error(s"Failed in drop table = ${schema}.${table}. Query: `${dropQuery}``", e)
@@ -72,7 +85,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
 
       if (mode == "batch") {
         Try {
-          stmt.execute(
+          stmtTarget.execute(
             dbTemplate.createTable(
               schema,
               table,
@@ -119,31 +132,36 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         }
       }
 
-      val query: String = if (genType == "semi-synthetic") Try(tableSettings("source_db_query").toString()) match {
-        case Success(v) => v.replaceAll("\"", "")
-        case Failure(_) => {
-          logger.warning(
-            s"For source_db_query set `SELECT 1 WHERE false` since it was specified for table = ${schema}.${table}")
-          "SELECT 1 WHERE false"
+      val query: String =
+        if (genType == "semi-synthetic") Try(tableSettings("source_db_query").toString()) match {
+          case Success(v) => v.replaceAll("\"", "")
+          case Failure(_) => {
+            logger.warning(
+              s"For source_db_query set `SELECT 1 WHERE false` since it was specified for table = ${schema}.${table}"
+            )
+            "SELECT 1 WHERE false"
+          }
         }
-      } else "SELECT 1 WHERE false"
+        else "SELECT 1 WHERE false"
 
-      val replication: Boolean = if (genType == "semi-synthetic") Try(tableSettings("replication").bool) match {
-        case Success(v) => v
-        case Failure(_) => {
-          logger.warning(
-            s"For replication set TRUE since it was specified for table = ${schema}.${table}")
-          true
+      val replication: Boolean =
+        if (genType == "semi-synthetic") Try(tableSettings("replication").bool) match {
+          case Success(v) => v
+          case Failure(_) => {
+            logger.warning(
+              s"For replication set TRUE since it was specified for table = ${schema}.${table}"
+            )
+            true
+          }
         }
-      } else false
+        else false
 
-      val src: ResultSet = stmt.executeQuery(query)
+      val src: ResultSet = stmtSrc.executeQuery(query)
       src.last()
       if (src.getRow == 0 & genType == "semi-synthetic") {
         logger.warning(s"No data was got from source for query: ${query}")
         GeneratedData(List.empty, List.empty)
-      }
-      else {
+      } else {
         Try(generator(rule, rowCount, logger, src, replication)) match {
           case Success(v) =>
             Try(v.transpose) match {
@@ -152,13 +170,14 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
                   v,
                   v.map(x => cols.map(x => x("name").toString().replaceAll("\"", "")).zip(x).toMap)
                 )
-              case Failure(e) => {
-                logger.error(
-                  s"Incorrect data was generated or in rules specified incompatible parameters row_count = ${rowCount} and " +
-                    s"action = insert data with length != ${rowCount} for table = ${schema}.${table}",
-                  e
-                )
-              }
+              case Failure(e) =>
+                {
+                  logger.error(
+                    s"Incorrect data was generated or in rules specified incompatible parameters row_count = ${rowCount} and " +
+                      s"action = insert data with length != ${rowCount} for table = ${schema}.${table}",
+                    e
+                  )
+                }
                 GeneratedData(List.empty, List.empty)
             }
           case Failure(e) => {
@@ -188,13 +207,13 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
             "synthetic"
           }
           case _ => {
-            logger.info(s"App mode = ${v.toLowerCase} was specified")
+            logger.info(s"Generation Type = ${v.toLowerCase} was specified")
             v.toLowerCase
           }
         }
       case Failure(e) => {
         logger.error("Failed in parsing genType", e)
-        ""
+        "NoDef"
       }
     }
 
@@ -215,11 +234,93 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         }
       case Failure(e) => {
         logger.error("Failed in parsing app mode", e)
-        ""
+        "NoDef"
       }
     }
 
-    var con: Connection = null
+    val srcType = Try(config.get.source.name) match {
+      case Success(v) =>
+        v match {
+          case "NoDef" => {
+            logger.warning(
+              "Not specified Data Source Type. Please specify one of following supported sources: " +
+                "[Hive, Postgres, Greenplum, Kafka]"
+            )
+            v
+          }
+          case _ => {
+            logger.info(s"Data Source Type = ${v.toLowerCase} was specified")
+            v.toLowerCase
+          }
+        }
+      case Failure(e) => {
+        logger.error("Failed in parsing Data Source Type", e)
+        "NoDef"
+      }
+    }
+
+    val targetType = Try(config.get.target.name) match {
+      case Success(v) =>
+        v match {
+          case "NoDef" => {
+            logger.warning(
+              "Not specified Data Target Type. Please specify one of following supported targets: " +
+                "[Hive, Postgres, Greenplum, Kafka]"
+            )
+            v
+          }
+          case _ => {
+            logger.info(s"Data Target Type = ${v.toLowerCase} was specified")
+            v.toLowerCase
+          }
+        }
+      case Failure(e) => {
+        logger.error("Failed in parsing Data Target Type", e)
+        "NoDef"
+      }
+    }
+
+    if (List(genType, mode, srcType, targetType).contains("NoDef"))
+      throw new Exception(
+        "Required params was not specified or raised error in parsing for [genType, mode, srcType, targetType]"
+      )
+
+    val supportedDb = List("hive", "postgres", "greenplum")
+    val kafka = "kafka"
+
+    val srcIsDb = supportedDb.contains(srcType)
+    val targetIsDB = supportedDb.contains(targetType)
+    val srcIsKafka = kafka == srcType
+    val targetIsKafka = kafka == targetType
+
+    val dbOnly = srcIsDb & targetIsDB
+    val dbExist = srcIsDb | targetIsDB
+    val dbOneSrcTarget = srcType == targetType & dbExist
+    val kafkaOnly = srcIsKafka & targetIsKafka
+    val kafkaExist = srcIsKafka | targetIsKafka
+
+    val dbConn = new DatabaseConnectionPoolImpl()
+    val srcDbConf: DatabaseConfigMap = DatabaseConfigMap("src", props.dbConfig)
+    val dbConnUrlStr = s"[${props.dbConfig.connectionUrl}, ${props.dbConfigTarget.connectionUrl}]"
+    val dbConnectionPool: Map[String, Connection] = Try(
+      if (dbOneSrcTarget) {
+        dbConn.connectionPool(List(srcDbConf))
+      } else
+        dbConn.connectionPool(List(srcDbConf, DatabaseConfigMap("target", props.dbConfigTarget)))
+    ) match {
+      case Success(v) => {
+        logger.info(s"Successfully created connection to database(s): ${dbConnUrlStr}")
+        v
+      }
+      case Failure(e) => {
+        logger.error(s"Failed in connection to databases =  ${dbConnUrlStr}", e)
+        Map.empty
+      }
+    }
+
+    if (dbExist & dbConnectionPool.isEmpty) throw new Exception("No connections to databases")
+
+//    var con: Connection = null
 
     val propPars = new PropertiesParsableImpl()
 
@@ -231,41 +332,41 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       }
     }
 
-    if (mode == "batch") {
-      Class.forName(props.dbConfig.driver)
-      con = Try(
-        DriverManager.getConnection(
-          props.dbConfig.connectionUrl,
-          props.dbConfig.user,
-          props.dbConfig.password
-        )
-      ) match {
-        case Success(v) => {
-          logger.info(
-            s"Successfully created connection to database = ${props.dbConfig.connectionUrl}"
-          )
-          v
+    val stmtSrc: Statement =
+      if (srcIsDb) {
+        Try(
+          dbConnectionPool("src")
+            .createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)
+        ) match {
+          case Success(v) => v
+          case Failure(e) => {
+            logger.error(
+              s"Failed create statement connection for database = ${props.dbConfig.connectionUrl}",
+              e
+            )
+            null
+          }
         }
-        case Failure(e) => {
-          logger.error(s"Failed in connection to database = ${props.dbConfig.connectionUrl}", e)
-          con
+      } else null
+
+    val stmtTarget: Statement =
+      if (targetIsDB) {
+        Try(
+          dbConnectionPool("target")
+            .createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)
+        ) match {
+          case Success(v) => v
+          case Failure(e) => {
+            logger.error(
+              s"Failed create statement connection for database = ${props.dbConfig.connectionUrl}",
+              e
+            )
+            null
+          }
         }
-      }
-    }
+      } else null
 
-    val stmt: Statement = if (mode == "batch") Try(con.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) match {
-      case Success(v) => v
-      case Failure(e) => {
-        logger.error(
-          s"Failed create statement connection for database = ${props.dbConfig.connectionUrl}",
-          e
-        )
-        null
-      }
-    }
-    else null
-
-    val dbName = config.get.targetDatabaseType.name.toLowerCase
+    val dbName = config.get.target.name.toLowerCase
     val dbVersion = props.dbConfig.dbVersion
     val dbTemplate = dbName match {
       case "hive" => new HiveTemplateImpl()
@@ -297,10 +398,9 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       if (mode == "batch") {
         if (schema.isEmpty) logger.warning(s"Incorrect specified database schema name in rules")
         else if (List("postgres", "greenplum").contains(dbName) & dbVersion != 0 & dbVersion < 10) {
-          stmt.execute(dbTemplate.dropSchema(schema))
-          stmt.execute(dbTemplate.createSchema(schema))
-        }
-        else stmt.execute(dbTemplate.createSchema(schema))
+          stmtTarget.execute(dbTemplate.dropSchema(schema))
+          stmtTarget.execute(dbTemplate.createSchema(schema))
+        } else stmtTarget.execute(dbTemplate.createSchema(schema))
       }
 
       val tables = Try(schemaSettings("tables").arr.toList) match {
@@ -323,7 +423,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         if (table.nonEmpty) {
           if (mode == "batch") {
             val generatedData = Try(
-              generateTable(stmt, schema, table, tableSettings, dbTemplate, logger, mode, genType)
+              generateTable(stmtSrc, stmtTarget, schema, table, tableSettings, dbTemplate, logger, mode, genType)
             ) match {
               case Success(v) => v
               case Failure(e) => {
@@ -349,7 +449,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
             }
 
             if (insertQueries.nonEmpty) {
-              insertQueries.map(stmt.execute)
+              insertQueries.map(stmtTarget.execute)
               logger.info(
                 s"${insertQueries.length} row(s) inserted into table = ${schema}.${table}"
               )
@@ -377,7 +477,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
             }
 
             val data = (Try(
-              generateTable(stmt, schema, table, tableSettings, dbTemplate, logger, mode, genType)
+              generateTable(stmtSrc, stmtTarget, schema, table, tableSettings, dbTemplate, logger, mode, genType)
             ) match {
               case Success(v) => v
               case Failure(e) => {
@@ -398,15 +498,15 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       }
     }
 
-    if (mode == "batch") {
-      Try(con.close()) match {
+    if (dbExist) {
+      Try(dbConnectionPool.foreach(x => x._2.close())) match {
         case Success(_) =>
           logger.info(
-            s"Successfully connection closed for database = ${props.dbConfig.connectionUrl}"
+            s"Successfully connection closed for database(s) = ${dbConnUrlStr}"
           )
         case Failure(e) =>
           logger.error(
-            s"Failed closing connection for database = ${props.dbConfig.connectionUrl}",
+            s"Failed closing connection for database(s) = ${dbConnUrlStr}",
             e
           )
       }
