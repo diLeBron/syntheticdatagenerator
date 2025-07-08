@@ -5,8 +5,9 @@ import java.time.temporal.ChronoUnit.{DAYS, SECONDS}
 import java.time.{LocalDate, LocalDateTime, ZoneOffset}
 import scala.util.Random
 import ujson.Value
-
 import ru.digitalleague.syntheticdatagenerator.utils.SimpleLogger
+
+import java.sql.ResultSet
 
 object SampleGenerator {
   private val random = new Random(System.nanoTime)
@@ -87,7 +88,9 @@ object SampleGenerator {
       action: String,
       rule: Map[String, Value],
       count: Int,
-      logger: SimpleLogger
+      logger: SimpleLogger,
+      src: ResultSet,
+      replication: Boolean
   ): List[Any] = {
     val dtype = dataType.split('(').head
     if (action.toLowerCase == "insert") {
@@ -176,6 +179,24 @@ object SampleGenerator {
           List.empty
       }
     }
+    else if (action.toLowerCase == "modification") {
+      src.last()
+      val srcCount = src.getRow
+      src.beforeFirst()
+      val col = rule("src_column").toString().replaceAll("\"", "")
+
+      val srcRows = dtype match {
+        case "int" => List.fill(srcCount)(0).map(x => if (src.next()) src.getInt(col) else x)
+        case "timestamp" => List.fill(srcCount)("'1970-01-01'").map(x => if (src.next()) s"'${src.getTimestamp(col)}'" else x)
+        case "string" => List.fill(srcCount)("''").map(x => if (src.next()) s"'${src.getString(col)}'" else x)
+        case "varchar" => List.fill(srcCount)("''").map(x => if (src.next()) s"'${src.getString(col)}'" else x)
+        case "boolean" => List.fill(srcCount)(null).map(x => if (src.next()) src.getBoolean(col) else x)
+      }
+
+      if (count != srcCount & replication) {
+        List.fill(count)(srcRows).map(_ => srcRows(between(0, srcCount - 1)))
+      } else srcRows
+    }
     else {
       logger.warning(s"Unsupported data action = ${action}. Supported: [generation, insert]")
       List.empty
@@ -185,9 +206,11 @@ object SampleGenerator {
   def generator(
       rules: List[(String, String, Map[String, Value])],
       count: Int,
-      logger: SimpleLogger
+      logger: SimpleLogger,
+      src: ResultSet,
+      replication: Boolean
   ): List[List[Any]] = {
-    val a = rules.map(x => generate(x._1, x._2, x._3, count, logger))
+    val a = rules.map(x => generate(x._1, x._2, x._3, count, logger, src, replication))
     a
   }
 

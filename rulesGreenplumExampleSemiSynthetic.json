@@ -1,0 +1,94 @@
+[
+  {
+    "schema": "schema_1",
+    "tables": [
+      {
+        "name": "table_1A",
+        "kafka_topic": "schema_1.table_1A",
+        "source_db_query": "SELECT id, upper(name) as name, salary, active, CURRENT_TIMESTAMP as ts FROM src_schema_1.src_table_1A WHERE id > 0 ORDER BY id",
+        "row_count": 50,
+        "replication": true,
+        "recreate": true,
+        "columns": [
+          {
+            "name": "own_id",
+            "type": "int",
+            "nullable": false,
+            "unique": true,
+            "isPrimaryKey": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "initial_value": 1,
+                "repeat_number": 1,
+                "step": 1
+              }
+            }
+          },
+          {
+            "name": "own_date_inserted",
+            "type": "timestamp",
+            "nullable": false,
+            "unique": false,
+            "isPrimaryKey": false,
+            "data": {
+              "action": "modification",
+              "rules": {
+                "src_column": "ts"
+              }
+            }
+          },
+          {
+            "name": "src_id",
+            "type": "int",
+            "nullable": false,
+            "unique": false,
+            "isPrimaryKey": false,
+            "data": {
+              "action": "modification",
+              "rules": {
+                "src_column": "id"
+              }
+            }
+          },
+          {
+            "name": "src_name",
+            "type": "varchar(100)",
+            "nullable": false,
+            "unique": false,
+            "data": {
+              "action": "modification",
+              "rules": {
+                "src_column": "name"
+              }
+            }
+          },
+          {
+            "name": "src_salary",
+            "type": "int",
+            "nullable": false,
+            "unique": false,
+            "data": {
+              "action": "modification",
+              "rules": {
+                "src_column": "salary"
+              }
+            }
+          },
+          {
+            "name": "src_active",
+            "type": "boolean",
+            "nullable": false,
+            "unique": false,
+            "data": {
+              "action": "modification",
+              "rules": {
+                "src_column": "active"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

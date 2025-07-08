@@ -18,8 +18,13 @@ case class DatabaseConfig(
 
 case class KafkaConfig(brokers: String) extends PropertiesConfig
 
-case class PropsConfig(dbConfig: DatabaseConfig, rulesPath: String, kafkaConfig: KafkaConfig)
-    extends PropertiesConfig
+case class PropsConfig(
+    dbConfig: DatabaseConfig,
+    dbConfigTarget: DatabaseConfig,
+    rulesPath: String,
+    kafkaConfig: KafkaConfig,
+    kafkaConfigTarget: KafkaConfig
+) extends PropertiesConfig
 
 case class SyntheticRules(
     mapRowCount: Map[String, Int],

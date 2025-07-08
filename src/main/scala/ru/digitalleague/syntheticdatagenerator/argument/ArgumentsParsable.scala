@@ -45,12 +45,18 @@ class ArgumentsParsableImpl extends ArgumentsParsable {
         opt[CredsConfig]('a', "authorName")
           .action((x, c) => c.copy(credsConfig = x))
           .text("authorName is CredsConfig property"),
-        opt[DatabaseType]('t', "targetDBType")
+        opt[DatabaseType]('s', "srcDataType")
           .action((x, c) => c.copy(targetDatabaseType = x))
           .validate(x =>
-            if (List("hive", "postgres", "greenplum").contains(x.name.toLowerCase())) success
-            else failure("Supported target database types: [Hive, Postgres, Greenplum]"))
+            if (List("hive", "postgres", "greenplum", "kafka").contains(x.name.toLowerCase())) success
+            else failure("Supported sources: [Hive, Postgres, Greenplum, Kafka]"))
           .text("srcDataType is DataTypes property"),
+        opt[DatabaseType]('t', "targetDataType")
+          .action((x, c) => c.copy(targetDatabaseType = x))
+          .validate(x =>
+            if (List("hive", "postgres", "greenplum", "kafka").contains(x.name.toLowerCase())) success
+            else failure("Supported targets: [Hive, Postgres, Greenplum, Kafka]"))
+          .text("targetDataType is DataTypes property"),
         opt[GenerationTypes]('g', "genType")
           .action((x, c) => c.copy(genType = x))
           .validate(x =>

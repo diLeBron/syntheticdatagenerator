@@ -1,0 +1,75 @@
+[
+  {
+    "schema": "src_schema_1",
+    "tables": [
+      {
+        "name": "src_table_1A",
+        "kafka_topic": "schema_1.table_1A",
+        "row_count": 10,
+        "recreate": true,
+        "columns": [
+          {
+            "name": "id",
+            "type": "int",
+            "nullable": false,
+            "unique": true,
+            "isPrimaryKey": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "initial_value": 1,
+                "repeat_number": 1,
+                "step": 1
+              }
+            }
+          },
+          {
+            "name": "salary",
+            "type": "int",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+              }
+            }
+          },
+          {
+            "name": "active",
+            "type": "boolean",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+              }
+            }
+          },
+          {
+            "name": "ts",
+            "type": "timestamp",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {
+                "start": "2023-08-08T12:15:30",
+                "step_by_minutes": 1
+              }
+            }
+          },
+          {
+            "name": "name",
+            "type": "varchar(10)",
+            "nullable": true,
+            "unique": false,
+            "data": {
+              "action": "generation",
+              "rules": {}
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

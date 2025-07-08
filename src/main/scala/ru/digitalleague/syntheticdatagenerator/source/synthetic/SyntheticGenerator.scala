@@ -9,9 +9,9 @@ import ru.digitalleague.syntheticdatagenerator.streams.flink.FlinkSinkToKafkaApp
 import ru.digitalleague.syntheticdatagenerator.streams.kafka.Client.createTopic
 import ujson.Value
 import ru.digitalleague.syntheticdatagenerator.utils.Json.convertToJson
-import ru.digitalleague.syntheticdatagenerator.utils.{HiveTemplateImpl, PostgresOlder10vTemplateImpl, PostgresTemplateImpl, SimpleLogger, Template}
+import ru.digitalleague.syntheticdatagenerator.utils.{GenerationType, HiveTemplateImpl, PostgresOlder10vTemplateImpl, PostgresTemplateImpl, SimpleLogger, Template}
 
-import java.sql.{Connection, DriverManager, Statement}
+import java.sql.{Connection, DriverManager, ResultSet, Statement}
 import scala.sys.exit
 import scala.util.{Failure, Success, Try}
 
@@ -27,7 +27,8 @@ trait SyntheticGenerator {
       tableSettings: Value,
       dbTemplate: Template,
       logger: SimpleLogger,
-      mode: String
+      mode: String,
+      genType: String
   ): GeneratedData
 }
 
@@ -41,7 +42,8 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       tableSettings: Value,
       dbTemplate: Template,
       logger: SimpleLogger,
-      mode: String
+      mode: String,
+      genType: String
   ): GeneratedData = {
     val rowCount = Try(tableSettings("row_count").num.toInt) match {
       case Success(v) => v
@@ -117,27 +119,52 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         }
       }
 
-      Try(generator(rule, rowCount, logger)) match {
-        case Success(v) =>
-          Try(v.transpose) match {
-            case Success(v) =>
-              GeneratedData(
-                v,
-                v.map(x => cols.map(x => x("name").toString().replaceAll("\"", "")).zip(x).toMap)
-              )
-            case Failure(e) =>
-              {
+      val query: String = if (genType == "semi-synthetic") Try(tableSettings("source_db_query").toString()) match {
+        case Success(v) => v.replaceAll("\"", "")
+        case Failure(_) => {
+          logger.warning(
+            s"For source_db_query set `SELECT 1 WHERE false` since it was specified for table = ${schema}.${table}")
+          "SELECT 1 WHERE false"
+        }
+      } else "SELECT 1 WHERE false"
+
+      val replication: Boolean = if (genType == "semi-synthetic") Try(tableSettings("replication").bool) match {
+        case Success(v) => v
+        case Failure(_) => {
+          logger.warning(
+            s"For replication set TRUE since it was specified for table = ${schema}.${table}")
+          true
+        }
+      } else false
+
+      val src: ResultSet = stmt.executeQuery(query)
+      src.last()
+      if (src.getRow == 0 & genType == "semi-synthetic") {
+        logger.warning(s"No data was got from source for query: ${query}")
+        GeneratedData(List.empty, List.empty)
+      }
+      else {
+        Try(generator(rule, rowCount, logger, src, replication)) match {
+          case Success(v) =>
+            Try(v.transpose) match {
+              case Success(v) =>
+                GeneratedData(
+                  v,
+                  v.map(x => cols.map(x => x("name").toString().replaceAll("\"", "")).zip(x).toMap)
+                )
+              case Failure(e) => {
                 logger.error(
                   s"Incorrect data was generated or in rules specified incompatible parameters row_count = ${rowCount} and " +
                     s"action = insert data with length != ${rowCount} for table = ${schema}.${table}",
                   e
                 )
               }
-              GeneratedData(List.empty, List.empty)
+                GeneratedData(List.empty, List.empty)
+            }
+          case Failure(e) => {
+            logger.error(s"Failed in generation data for table = ${schema}.${table}", e)
+            GeneratedData(List.empty, List.empty)
           }
-        case Failure(e) => {
-          logger.error(s"Failed in generation data for table = ${schema}.${table}", e)
-          GeneratedData(List.empty, List.empty)
         }
       }
     } else GeneratedData(List.empty, List.empty)
@@ -149,6 +176,27 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       logger: SimpleLogger
   ): Unit = {
 //    System.setProperty("hadoop.home.dir", "C:\\hadoop")
+
+    val genType = Try(config.get.genType.name) match {
+      case Success(v) =>
+        v match {
+          case "NoDef" => {
+            logger.warning(
+              "Set default app genType = synthetic because not specified in arguments. " +
+                "For another mode pLease specify throw args -g or --genType. Supported: [synthetic, semi-synthetic]"
+            )
+            "synthetic"
+          }
+          case _ => {
+            logger.info(s"App mode = ${v.toLowerCase} was specified")
+            v.toLowerCase
+          }
+        }
+      case Failure(e) => {
+        logger.error("Failed in parsing genType", e)
+        ""
+      }
+    }
 
     val mode = Try(config.get.mode) match {
       case Success(v) =>
@@ -205,7 +253,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       }
     }
 
-    val stmt: Statement = if (mode == "batch") Try(con.createStatement()) match {
+    val stmt: Statement = if (mode == "batch") Try(con.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) match {
       case Success(v) => v
       case Failure(e) => {
         logger.error(
@@ -275,7 +323,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         if (table.nonEmpty) {
           if (mode == "batch") {
             val generatedData = Try(
-              generateTable(stmt, schema, table, tableSettings, dbTemplate, logger, mode)
+              generateTable(stmt, schema, table, tableSettings, dbTemplate, logger, mode, genType)
             ) match {
               case Success(v) => v
               case Failure(e) => {
@@ -329,7 +377,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
             }
 
             val data = (Try(
-              generateTable(stmt, schema, table, tableSettings, dbTemplate, logger, mode)
+              generateTable(stmt, schema, table, tableSettings, dbTemplate, logger, mode, genType)
             ) match {
               case Success(v) => v
               case Failure(e) => {
