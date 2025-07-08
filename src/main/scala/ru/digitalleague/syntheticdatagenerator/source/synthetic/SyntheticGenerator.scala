@@ -349,8 +349,8 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         }
       } else null
 
-    val stmtTarget: Statement =
-      if (targetIsDB) {
+    val stmtTarget: Statement = {
+      if (targetIsDB & !dbOnly) {
         Try(
           dbConnectionPool("target")
             .createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)
@@ -364,7 +364,8 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
             null
           }
         }
-      } else null
+      } else if (dbOnly) stmtSrc else null
+    }
 
     val dbName = config.get.target.name.toLowerCase
     val dbVersion = props.dbConfig.dbVersion
