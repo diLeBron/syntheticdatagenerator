@@ -40,7 +40,8 @@ trait SyntheticGenerator {
       dbTemplate: Template,
       logger: SimpleLogger,
       mode: String,
-      genType: String
+      genType: String,
+      isDatabase: Boolean
   ): GeneratedData
 }
 
@@ -56,7 +57,8 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       dbTemplate: Template,
       logger: SimpleLogger,
       mode: String,
-      genType: String
+      genType: String,
+      isDatabase: Boolean
   ): GeneratedData = {
     val rowCount = Try(tableSettings("row_count").num.toInt) match {
       case Success(v) => v
@@ -66,7 +68,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       }
     }
     if (rowCount > 0) {
-      if (mode == "batch" & tableSettings("recreate").bool) {
+      if (isDatabase & tableSettings("recreate").bool) {
         val dropQuery = dbTemplate.dropTable(schema, table)
         Try(stmtTarget.execute(dropQuery)) match {
           case Success(_) => logger.info(s"Successfully drop table if exists = ${schema}.${table}")
@@ -83,7 +85,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         }
       }
 
-      if (mode == "batch") {
+      if (isDatabase) {
         Try {
           stmtTarget.execute(
             dbTemplate.createTable(
@@ -156,9 +158,13 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         }
         else false
 
-      val src: ResultSet = stmtSrc.executeQuery(query)
-      src.last()
-      if (src.getRow == 0 & genType == "semi-synthetic") {
+      val src: ResultSet = if (genType == "semi-synthetic") stmtSrc.executeQuery(query) else null
+      val srcRows = if (genType == "semi-synthetic") {
+        src.last()
+        src.getRow
+      } else 0
+
+      if (srcRows == 0 & genType == "semi-synthetic") {
         logger.warning(s"No data was got from source for query: ${query}")
         GeneratedData(List.empty, List.empty)
       } else {
@@ -202,7 +208,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
           case "NoDef" => {
             logger.warning(
               "Set default app genType = synthetic because not specified in arguments. " +
-                "For another mode pLease specify throw args -g or --genType. Supported: [synthetic, semi-synthetic]"
+                "For another genType please specify throw args -g or --genType. Supported: [synthetic, semi-synthetic]"
             )
             "synthetic"
           }
@@ -280,7 +286,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       }
     }
 
-    if (List(genType, mode, srcType, targetType).contains("NoDef"))
+    if (genType == "semi-synthetic" & List(mode, srcType, targetType).contains("NoDef"))
       throw new Exception(
         "Required params was not specified or raised error in parsing for [genType, mode, srcType, targetType]"
       )
@@ -350,7 +356,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       } else null
 
     val stmtTarget: Statement = {
-      if (targetIsDB & !dbOnly) {
+      if (targetIsDB) {
         Try(
           dbConnectionPool("target")
             .createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)
@@ -378,7 +384,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         if (dbVersion != 0 & dbVersion < 10) new PostgresOlder10vTemplateImpl()
         else new PostgresTemplateImpl()
       case dbType => {
-        if (mode == "batch") {
+        if (targetIsDB) {
           logger.warning(
             s"Unsupported target database type specified: `${dbType}`. Supported: [hive, postgres]"
           )
@@ -396,7 +402,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         }
       }
 
-      if (mode == "batch") {
+      if (targetIsDB) {
         if (schema.isEmpty) logger.warning(s"Incorrect specified database schema name in rules")
         else if (List("postgres", "greenplum").contains(dbName) & dbVersion != 0 & dbVersion < 10) {
           stmtTarget.execute(dbTemplate.dropSchema(schema))
@@ -422,9 +428,9 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         }
 
         if (table.nonEmpty) {
-          if (mode == "batch") {
+          if (targetIsDB) {
             val generatedData = Try(
-              generateTable(stmtSrc, stmtTarget, schema, table, tableSettings, dbTemplate, logger, mode, genType)
+              generateTable(stmtSrc, stmtTarget, schema, table, tableSettings, dbTemplate, logger, mode, genType, true)
             ) match {
               case Success(v) => v
               case Failure(e) => {
@@ -457,7 +463,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
             }
           }
 
-          if (mode == "stream") {
+          if (targetIsKafka) {
             val topicName = Try(
               tableSettings("kafka_topic").toString().replaceAll("\"", "")
             ) match {
@@ -478,7 +484,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
             }
 
             val data = (Try(
-              generateTable(stmtSrc, stmtTarget, schema, table, tableSettings, dbTemplate, logger, mode, genType)
+              generateTable(stmtSrc, stmtTarget, schema, table, tableSettings, dbTemplate, logger, mode, genType, false)
             ) match {
               case Success(v) => v
               case Failure(e) => {

@@ -30,11 +30,11 @@ class PropertiesParsableImpl extends PropertiesParsable {
     val props = properties(fileName)
     PropsConfig(
       DatabaseConfig(
-        props.getProperty("connection.url"),
-        props.getProperty("driver.class.name"),
-        props.getProperty("user"),
-        props.getProperty("password"),
-        props.getProperty("database.version", "0").toInt
+        props.getProperty("connection.url.src"),
+        props.getProperty("driver.class.name.src"),
+        props.getProperty("user.src"),
+        props.getProperty("password.src"),
+        props.getProperty("database.version.src", "0").toInt
       ),
       DatabaseConfig(
         props.getProperty("connection.url.target"),
@@ -44,7 +44,7 @@ class PropertiesParsableImpl extends PropertiesParsable {
         props.getProperty("database.version.target", "0").toInt
       ),
       props.getProperty("synthetic.rules.path"),
-      KafkaConfig(props.getProperty("kafka.brokers")),
+      KafkaConfig(props.getProperty("kafka.brokers.src")),
       KafkaConfig(props.getProperty("kafka.brokers.target"))
     )
   }
