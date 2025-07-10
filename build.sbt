@@ -36,16 +36,17 @@ libraryDependencies ++= Seq(
 //  "org.apache.flink" %% "flink-scala" % "1.14.4",
   "org.apache.flink" %% "flink-streaming-scala" % "1.14.4",
   "org.apache.flink" %% "flink-connector-kafka" % "1.14.4",
+  "org.apache.flink" %% "flink-connector-jdbc" % "1.14.4",
 //  "org.apache.flink" % "flink-connector-base" % "1.14.4",
   "org.apache.flink" %% "flink-clients" % "1.14.4",
   "org.apache.kafka" %% "kafka" % "3.7.0",
   "com.lihaoyi" %% "ujson" % uVersion,
 //  "com.lihaoyi" %% "upickle" % uVersion,
-//  "org.scalatest" %% "scalatest" % "3.2.18" % Test,
-//  "org.testcontainers" % "testcontainers" % "1.19.7" % Test,
-//  "com.dimafeng" %% "testcontainers-scala-scalatest" % "0.41.3" % Test,
-//  "com.dimafeng" %% "testcontainers-scala-kafka" % "0.41.3" % Test,
-//  "org.scalatest" %% "scalatest-flatspec" % "3.2.18" % Test
+  "org.scalatest" %% "scalatest" % "3.2.18" % Test,
+  "org.testcontainers" % "testcontainers" % "1.19.7" % Test,
+  "com.dimafeng" %% "testcontainers-scala-scalatest" % "0.41.3" % Test,
+  "com.dimafeng" %% "testcontainers-scala-kafka" % "0.41.3" % Test,
+  "org.scalatest" %% "scalatest-flatspec" % "3.2.18" % Test
 )
 
 dependencyOverrides += "org.scala-lang.modules" %% "scala-xml" % "2.1.0"

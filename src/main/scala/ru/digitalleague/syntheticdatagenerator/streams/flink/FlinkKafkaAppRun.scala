@@ -9,13 +9,15 @@ import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsIni
 import org.apache.flink.core.execution.JobClient
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 
+import scala.collection.JavaConverters._
+
 object FlinkKafkaAppRun {
-  def apply(bootstrapServers: String, inputTopic: String, outputTopic: String, groupId: String = "flinkTest"): JobClient  = {
+  def apply(bootstrapServers: String, inputTopics: List[String], outputTopic: String, groupId: String = "flinkTest"): JobClient  = {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
 
     val kafkaConsumer = KafkaSource.builder()
       .setBootstrapServers(bootstrapServers)
-      .setTopics(inputTopic)
+      .setTopics(inputTopics.asJava)
       .setGroupId(groupId)
       .setStartingOffsets(OffsetsInitializer.earliest())
       .setValueOnlyDeserializer(new SimpleStringSchema())

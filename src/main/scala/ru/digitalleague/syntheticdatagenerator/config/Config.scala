@@ -19,10 +19,10 @@ case class DatabaseConfig(
 case class KafkaConfig(brokers: String) extends PropertiesConfig
 
 case class PropsConfig(
-    dbConfig: DatabaseConfig,
+    dbConfigSrc: DatabaseConfig,
     dbConfigTarget: DatabaseConfig,
     rulesPath: String,
-    kafkaConfig: KafkaConfig,
+    kafkaConfigSrc: KafkaConfig,
     kafkaConfigTarget: KafkaConfig
 ) extends PropertiesConfig
 

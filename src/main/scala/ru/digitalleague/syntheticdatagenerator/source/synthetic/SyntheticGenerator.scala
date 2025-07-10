@@ -29,7 +29,17 @@ import scala.util.{Failure, Success, Try}
 trait SyntheticGenerator {
 //  def generate(tmp: Template): SyntheticData
 
-  def generate(props: PropsConfig, config: Option[AppParamsConfig], logger: SimpleLogger): Unit
+  def generate(
+      props: PropsConfig,
+      config: Option[AppParamsConfig],
+      logger: SimpleLogger,
+      genType: String,
+      srcType: String,
+      targetType: String,
+      rules: List[Value],
+      supportedDb: List[String],
+      kafka: String
+  ): Unit
 
   def generateTable(
       stmtSrc: Statement,
@@ -39,7 +49,6 @@ trait SyntheticGenerator {
       tableSettings: Value,
       dbTemplate: Template,
       logger: SimpleLogger,
-      mode: String,
       genType: String,
       isDatabase: Boolean
   ): GeneratedData
@@ -56,7 +65,6 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       tableSettings: Value,
       dbTemplate: Template,
       logger: SimpleLogger,
-      mode: String,
       genType: String,
       isDatabase: Boolean
   ): GeneratedData = {
@@ -198,116 +206,26 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
   override def generate(
       props: PropsConfig,
       config: Option[AppParamsConfig],
-      logger: SimpleLogger
+      logger: SimpleLogger,
+      genType: String,
+      srcType: String,
+      targetType: String,
+      rules: List[Value],
+      supportedDb: List[String],
+      kafka: String
   ): Unit = {
 //    System.setProperty("hadoop.home.dir", "C:\\hadoop")
-
-    val genType = Try(config.get.genType.name) match {
-      case Success(v) =>
-        v match {
-          case "NoDef" => {
-            logger.warning(
-              "Set default app genType = synthetic because not specified in arguments. " +
-                "For another genType please specify throw args -g or --genType. Supported: [synthetic, semi-synthetic]"
-            )
-            "synthetic"
-          }
-          case _ => {
-            logger.info(s"Generation Type = ${v.toLowerCase} was specified")
-            v.toLowerCase
-          }
-        }
-      case Failure(e) => {
-        logger.error("Failed in parsing genType", e)
-        "NoDef"
-      }
-    }
-
-    val mode = Try(config.get.mode) match {
-      case Success(v) =>
-        v match {
-          case "NoDef" => {
-            logger.warning(
-              "Set default app mode = batch because not specified in arguments. " +
-                "For another mode pLease specify throw args -m or --mode. Supported: [batch, stream]"
-            )
-            "batch"
-          }
-          case _ => {
-            logger.info(s"App mode = ${v.toLowerCase} was specified")
-            v.toLowerCase
-          }
-        }
-      case Failure(e) => {
-        logger.error("Failed in parsing app mode", e)
-        "NoDef"
-      }
-    }
-
-    val srcType = Try(config.get.source.name) match {
-      case Success(v) =>
-        v match {
-          case "NoDef" => {
-            logger.warning(
-              "Not specified Data Source Type. Please specify one of following supported sources: " +
-                "[Hive, Postgres, Greenplum, Kafka]"
-            )
-            v
-          }
-          case _ => {
-            logger.info(s"Data Source Type = ${v.toLowerCase} was specified")
-            v.toLowerCase
-          }
-        }
-      case Failure(e) => {
-        logger.error("Failed in parsing Data Source Type", e)
-        "NoDef"
-      }
-    }
-
-    val targetType = Try(config.get.target.name) match {
-      case Success(v) =>
-        v match {
-          case "NoDef" => {
-            logger.warning(
-              "Not specified Data Target Type. Please specify one of following supported targets: " +
-                "[Hive, Postgres, Greenplum, Kafka]"
-            )
-            v
-          }
-          case _ => {
-            logger.info(s"Data Target Type = ${v.toLowerCase} was specified")
-            v.toLowerCase
-          }
-        }
-      case Failure(e) => {
-        logger.error("Failed in parsing Data Target Type", e)
-        "NoDef"
-      }
-    }
-
-    if (genType == "semi-synthetic" & List(mode, srcType, targetType).contains("NoDef"))
-      throw new Exception(
-        "Required params was not specified or raised error in parsing for [genType, mode, srcType, targetType]"
-      )
-
-    val supportedDb = List("hive", "postgres", "greenplum")
-    val kafka = "kafka"
-
     val srcIsDb = supportedDb.contains(srcType)
     val targetIsDB = supportedDb.contains(targetType)
-    val srcIsKafka = kafka == srcType
     val targetIsKafka = kafka == targetType
 
     val dbOnly = srcIsDb & targetIsDB
     val dbExist = srcIsDb | targetIsDB
     val dbOneSrcTarget = srcType == targetType & dbExist
-    val kafkaOnly = srcIsKafka & targetIsKafka
-    val kafkaExist = srcIsKafka | targetIsKafka
 
     val dbConn = new DatabaseConnectionPoolImpl()
-    val srcDbConf: DatabaseConfigMap = DatabaseConfigMap("src", props.dbConfig)
-    val dbConnUrlStr = s"[${props.dbConfig.connectionUrl}, ${props.dbConfigTarget.connectionUrl}]"
+    val srcDbConf: DatabaseConfigMap = DatabaseConfigMap("src", props.dbConfigSrc)
+    val dbConnUrlStr = s"[${props.dbConfigSrc.connectionUrl}, ${props.dbConfigTarget.connectionUrl}]"
     val dbConnectionPool: Map[String, Connection] = Try(
       if (dbOneSrcTarget) {
         dbConn.connectionPool(List(srcDbConf))
@@ -326,18 +244,6 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
 
     if (dbExist & dbConnectionPool.isEmpty) throw new Exception("No connections to databases")
 
-//    var con: Connection = null
-
-    val propPars = new PropertiesParsableImpl()
-
-    val rules = Try(propPars.rules(props.rulesPath)) match {
-      case Success(v) => v
-      case Failure(e) => {
-        logger.error("Failed in parsing rules", e)
-        List.empty
-      }
-    }
-
     val stmtSrc: Statement =
       if (srcIsDb) {
         Try(
@@ -347,7 +253,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
           case Success(v) => v
           case Failure(e) => {
             logger.error(
-              s"Failed create statement connection for database = ${props.dbConfig.connectionUrl}",
+              s"Failed create statement connection for database = ${props.dbConfigSrc.connectionUrl}",
               e
             )
             null
@@ -356,7 +262,8 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       } else null
 
     val stmtTarget: Statement = {
-      if (targetIsDB) {
+      if (dbOnly) stmtSrc
+      else if (targetIsDB) {
         Try(
           dbConnectionPool("target")
             .createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)
@@ -364,17 +271,18 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
           case Success(v) => v
           case Failure(e) => {
             logger.error(
-              s"Failed create statement connection for database = ${props.dbConfig.connectionUrl}",
+              s"Failed create statement connection for database = ${props.dbConfigSrc.connectionUrl}",
               e
             )
             null
           }
         }
-      } else if (dbOnly) stmtSrc else null
+      }
+      else null
     }
 
     val dbName = config.get.target.name.toLowerCase
-    val dbVersion = props.dbConfig.dbVersion
+    val dbVersion = props.dbConfigSrc.dbVersion
     val dbTemplate = dbName match {
       case "hive" => new HiveTemplateImpl()
       case "postgres" =>
@@ -430,7 +338,17 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
         if (table.nonEmpty) {
           if (targetIsDB) {
             val generatedData = Try(
-              generateTable(stmtSrc, stmtTarget, schema, table, tableSettings, dbTemplate, logger, mode, genType, true)
+              generateTable(
+                stmtSrc,
+                stmtTarget,
+                schema,
+                table,
+                tableSettings,
+                dbTemplate,
+                logger,
+                genType,
+                true
+              )
             ) match {
               case Success(v) => v
               case Failure(e) => {
@@ -478,13 +396,23 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
               }
             }
 
-            Try(createTopic(props.kafkaConfig.brokers, topicName)) match {
+            Try(createTopic(props.kafkaConfigSrc.brokers, topicName)) match {
               case Success(_) => logger.info(s"Successfully created kafka topic = ${topicName}")
-              case Failure(e) => logger.error(s"Failed in creating kafka topic = ${topicName}", e)
+              case Failure(_) => logger.warning(s"Failed in creating kafka topic = ${topicName}")
             }
 
             val data = (Try(
-              generateTable(stmtSrc, stmtTarget, schema, table, tableSettings, dbTemplate, logger, mode, genType, false)
+              generateTable(
+                stmtSrc,
+                stmtTarget,
+                schema,
+                table,
+                tableSettings,
+                dbTemplate,
+                logger,
+                genType,
+                false
+              )
             ) match {
               case Success(v) => v
               case Failure(e) => {
@@ -497,7 +425,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
             }).json.map(convertToJson)
 
             logger.info(s"Start stream with sink to kafka for topic = ${topicName}")
-            FlinkSinkToKafkaAppRun(props.kafkaConfig.brokers, data, topicName)
+            FlinkSinkToKafkaAppRun(props.kafkaConfigTarget.brokers, data, topicName)
             logger.info(s"${data.length} message(s) write to kafka topic = ${topicName}")
             logger.info(s"Terminated stream with sink to kafka for topic = ${topicName}")
           }

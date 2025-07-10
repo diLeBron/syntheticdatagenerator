@@ -1,4 +1,4 @@
-import argument.{AppParamsConfig, ArgumentsParsableImpl}
+import ru.digitalleague.syntheticdatagenerator.argument.{AppParamsConfig, ArgumentsParsableImpl}
 
 object ArgumentsParsableTest extends App {
   val ap = new ArgumentsParsableImpl

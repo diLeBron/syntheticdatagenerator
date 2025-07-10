@@ -1,5 +1,9 @@
 [
   {
+    "stream": {
+      "kafka.src.topics": ["kafka_src_topic_1", "kafka_src_topic_2"],
+      "kafka.target.topic": "kafka_target_topic"
+    },
     "schema": "schema_1",
     "tables": [
       {

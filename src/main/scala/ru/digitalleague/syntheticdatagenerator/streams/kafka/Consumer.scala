@@ -11,7 +11,7 @@ import scala.language.postfixOps
 
 object Consumer {
 
-  def apply(bootstrapServers: String, topic: String): List[String] = {
+  def apply(bootstrapServers: String, topic: String, countWaitMsg: Int = 1): List[String] = {
     val props = new Properties()
     props.put("bootstrap.servers", bootstrapServers)
 
@@ -31,7 +31,7 @@ object Consumer {
     if (records.isEmpty) {
       while (flag) {
         records = consumer.poll(1000)
-        if (!records.isEmpty) flag = false
+        if (records.count() == countWaitMsg) flag = false
       }
     }
 
@@ -45,11 +45,11 @@ object KafkaConsumerApp extends App {
   val props = new Properties()
   props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, brokers)
 
-  val adminClient = AdminClient.create(props)
-  val topicName = "schema_1.table_1A"
-  val topic = new NewTopic(topicName, 1, 1.toShort)
-  adminClient.createTopics(Seq(topic).asJava).all().get()
-  adminClient.close()
+//  val adminClient = AdminClient.create(props)
+  val topicName = "test_output"
+//  val topic = new NewTopic(topicName, 1, 1.toShort)
+//  adminClient.createTopics(Seq(topic).asJava).all().get()
+//  adminClient.close()
 
   props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer")
   props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer")
