@@ -1,4 +1,4 @@
-ThisBuild / version := "0.1.0-Synthetic"
+ThisBuild / version := "1.0.0"
 ThisBuild / scalaVersion := "2.12.15"
 
 val main_class: String = "ru.digitalleague.syntheticdatagenerator.Main"
