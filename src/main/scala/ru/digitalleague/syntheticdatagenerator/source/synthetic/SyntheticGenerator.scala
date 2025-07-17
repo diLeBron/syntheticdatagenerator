@@ -262,7 +262,7 @@ class SyntheticGeneratorImpl extends SyntheticGenerator {
       } else null
 
     val stmtTarget: Statement = {
-      if (dbOnly) stmtSrc
+      if (dbOneSrcTarget) stmtSrc
       else if (targetIsDB) {
         Try(
           dbConnectionPool("target")
